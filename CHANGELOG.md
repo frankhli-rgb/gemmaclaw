@@ -2,6 +2,24 @@
 
 Docs: https://docs.openclaw.ai
 
+## [2026.5.0](https://github.com/gemmaclaw/gemmaclaw/compare/gemmaclaw-v2026.4.23...gemmaclaw-v2026.5.0) (2026-05-08)
+
+
+### Features
+
+* add instance backup restore ([#113](https://github.com/gemmaclaw/gemmaclaw/issues/113)) ([21dcdc7](https://github.com/gemmaclaw/gemmaclaw/commit/21dcdc7b6ed9b97e6ba86fe3bda095c7eea59010))
+* add setup knowledge defaults ([#110](https://github.com/gemmaclaw/gemmaclaw/issues/110)) ([95883db](https://github.com/gemmaclaw/gemmaclaw/commit/95883db2d0d93673dc1b075fe345dd52a78718af))
+
+
+### Bug Fixes
+
+* **benchmark:** add per-task resumable agent results ([ec40193](https://github.com/gemmaclaw/gemmaclaw/commit/ec40193bb5073a595fe626c12a55016ead25a363))
+* comprehensive exclusion of test/harness/fixture files from bundle surface ([958fef8](https://github.com/gemmaclaw/gemmaclaw/commit/958fef8330135b8951b09155e0be6fc3d7166b22))
+* comprehensive exclusion of test/harness/fixture files from bundle surface ([3dae83b](https://github.com/gemmaclaw/gemmaclaw/commit/3dae83bd0b9b0d24ac094b3a7ce739ed2343575b))
+* comprehensive exclusion of test/harness/fixture files from bundle surface ([#121](https://github.com/gemmaclaw/gemmaclaw/issues/121)) ([958fef8](https://github.com/gemmaclaw/gemmaclaw/commit/958fef8330135b8951b09155e0be6fc3d7166b22))
+* exclude .test-helpers files from bundle surface entries ([#120](https://github.com/gemmaclaw/gemmaclaw/issues/120)) ([8985046](https://github.com/gemmaclaw/gemmaclaw/commit/8985046c9f8364567f92f25c786257a829d867fd))
+* set 4 GB heap limit in gemmaclaw launcher for large backup restores ([#115](https://github.com/gemmaclaw/gemmaclaw/issues/115)) ([9af6b67](https://github.com/gemmaclaw/gemmaclaw/commit/9af6b67614c5075944c7b1615cf106ed996ca429))
+
 ## [2026.4.23](https://github.com/gemmaclaw/gemmaclaw/compare/gemmaclaw-v2026.4.22...gemmaclaw-v2026.4.23) (2026-05-05)
 
 
