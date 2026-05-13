@@ -34,6 +34,7 @@ export function registerSetupCommand(program: Command) {
     .option("--vertex-project <id>", "GCP project ID for Vertex AI")
     .option("--vertex-region <region>", "GCP region for Vertex AI (default: us-central1)")
     .option("--vertex-model <model>", "Gemma model on Vertex AI (e.g. gemma-3-27b-it)")
+    .option("--vertex-dedicated-url <url>", "Dedicated prediction URL for Model Garden endpoints")
     .option("--wizard", "Run interactive onboarding (workspace config)", false)
     .option("--non-interactive", "Run onboarding without prompts", false)
     .option(
@@ -106,6 +107,7 @@ export function registerSetupCommand(program: Command) {
             project: opts.vertexProject as string | undefined,
             region: opts.vertexRegion as string | undefined,
             model: opts.vertexModel as string | undefined,
+            dedicatedUrl: opts.vertexDedicatedUrl as string | undefined,
             nonInteractive: Boolean(opts.nonInteractive),
           });
           if (!result.ok || !result.config) {
@@ -115,14 +117,15 @@ export function registerSetupCommand(program: Command) {
 
           // Write config
           const vertexConfigPatch = buildVertexConfig(result.config);
-          await writeConfigFile(vertexConfigPatch);
+          await writeConfigFile(vertexConfigPatch, { allowDestructiveWrite: true });
           console.log("\nConfig updated with Vertex AI provider.");
 
           // Write auth profile with gcloud access token
           if (result.config.accessToken) {
             const { resolveStateDir } = await import("../../config/paths.js");
             const stateDir = resolveStateDir(process.env);
-            const authPath = path.join(stateDir, "agents/main/agent/auth-profiles.json");
+            const agentName = (opts.agentName as string | undefined) ?? "main";
+            const authPath = path.join(stateDir, `agents/${agentName}/agent/auth-profiles.json`);
             let existing: Record<string, unknown> = { version: 1, profiles: {} };
             try {
               existing = JSON.parse(fs.readFileSync(authPath, "utf-8"));

@@ -86,7 +86,7 @@ export function getGcloudProject(): string | null {
 export function getGcloudAccessToken(): string | null {
   try {
     return (
-      execSync("gcloud auth print-access-token", {
+      execSync("gcloud auth application-default print-access-token", {
         encoding: "utf-8",
         stdio: ["pipe", "pipe", "pipe"],
         timeout: 10_000,
@@ -186,6 +186,7 @@ export async function interactiveVertexSetup(opts?: {
   region?: string;
   model?: string;
   apiFormat?: "native" | "openai";
+  dedicatedUrl?: string;
   nonInteractive?: boolean;
 }): Promise<VertexSetupResult> {
   const log = console.log;
@@ -242,10 +243,16 @@ export async function interactiveVertexSetup(opts?: {
       apiFormat = "openai";
     }
   }
+
+  // If dedicated URL is provided via opts, use it and force OpenAI format
+  let dedicatedUrl = opts?.dedicatedUrl;
+  if (dedicatedUrl) {
+    apiFormat = "openai";
+  }
+
   log(`  Protocol: ${apiFormat}`);
 
-  let dedicatedUrl: string | undefined;
-  if (apiFormat === "openai" && !opts?.nonInteractive) {
+  if (apiFormat === "openai" && !opts?.nonInteractive && !dedicatedUrl) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const answer = await rl.question(
       "\nDedicated Prediction URL (optional):\n" +
@@ -257,6 +264,10 @@ export async function interactiveVertexSetup(opts?: {
     if (answer.trim()) {
       dedicatedUrl = answer.trim();
     }
+  }
+
+  if (dedicatedUrl) {
+    log(`  Dedicated URL: ${dedicatedUrl}`);
   }
 
   // Auth Method: Static vs Automated
@@ -310,15 +321,19 @@ export async function interactiveVertexSetup(opts?: {
   log("  Access token obtained");
 
   // 5. Test connection
-  log("Testing Vertex AI connection...");
-  const test = await testVertexConnection(project, region, accessToken);
-  if (!test.ok) {
-    return {
-      ok: false,
-      error: `Vertex AI connection failed: ${test.error}. Check: project has Vertex AI API enabled, you have correct permissions.`,
-    };
+  if (!dedicatedUrl) {
+    log("Testing Vertex AI connection...");
+    const test = await testVertexConnection(project, region, accessToken);
+    if (!test.ok) {
+      return {
+        ok: false,
+        error: `Vertex AI connection failed: ${test.error}. Check: project has Vertex AI API enabled, you have correct permissions.`,
+      };
+    }
+    log("  Vertex AI connection OK");
+  } else {
+    log("  Skipping connection test (dedicated URL provided)");
   }
-  log("  Vertex AI connection OK");
 
   // 6. Model selection
   let model = opts?.model;
