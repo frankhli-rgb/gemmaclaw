@@ -12,27 +12,27 @@ export function registerProviderStreamForModel<TApi extends Api>(params: {
   workspaceDir?: string;
   env?: NodeJS.ProcessEnv;
 }): StreamFn | undefined {
-  const streamFn =
-    resolveProviderStreamFn({
-      provider: params.model.provider,
+  const resolvedPluginStreamFn = resolveProviderStreamFn({
+    provider: params.model.provider,
+    config: params.cfg,
+    workspaceDir: params.workspaceDir,
+    env: params.env,
+    context: {
       config: params.cfg,
-      workspaceDir: params.workspaceDir,
-      env: params.env,
-      context: {
-        config: params.cfg,
-        agentDir: params.agentDir,
-        workspaceDir: params.workspaceDir,
-        provider: params.model.provider,
-        modelId: params.model.id,
-        model: params.model,
-      },
-    }) ??
-    createTransportAwareStreamFnForModel(params.model, {
-      cfg: params.cfg,
       agentDir: params.agentDir,
       workspaceDir: params.workspaceDir,
-      env: params.env,
-    });
+      provider: params.model.provider,
+      modelId: params.model.id,
+      model: params.model,
+    },
+  });
+  const transportAwareStreamFn = createTransportAwareStreamFnForModel(params.model, {
+    cfg: params.cfg,
+    agentDir: params.agentDir,
+    workspaceDir: params.workspaceDir,
+    env: params.env,
+  });
+  const streamFn = resolvedPluginStreamFn ?? transportAwareStreamFn;
   if (!streamFn) {
     return undefined;
   }

@@ -6,7 +6,7 @@ import {
   parseTransportChunkUsage,
   resolveAzureOpenAIApiVersion,
   sanitizeTransportPayloadText,
-  __testing,
+  openaiTransportTesting,
 } from "./openai-transport-stream.js";
 import { attachModelProviderRequestTransport } from "./provider-request-config.js";
 import {
@@ -20,7 +20,7 @@ import { SYSTEM_PROMPT_CACHE_BOUNDARY } from "./system-prompt-cache-boundary.js"
 
 describe("openai transport stream", () => {
   it("moves Azure OpenAI completions api-version headers into default query params", () => {
-    const config = __testing.buildOpenAICompletionsClientConfig(
+    const config = openaiTransportTesting.buildOpenAICompletionsClientConfig(
       {
         id: "gpt-4o-mini",
         name: "GPT-4o Mini",
@@ -55,7 +55,7 @@ describe("openai transport stream", () => {
   });
 
   it("preserves configured base URL query params without moving non-Azure headers", () => {
-    const config = __testing.buildOpenAICompletionsClientConfig(
+    const config = openaiTransportTesting.buildOpenAICompletionsClientConfig(
       {
         id: "proxy-model",
         name: "Proxy Model",
@@ -1926,7 +1926,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.stopReason).toBe("stop");
     expect(output.content.some((block) => (block as { type?: string }).type === "toolCall")).toBe(
@@ -2020,7 +2025,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     const thinkingBlock = output.content[0] as { type: string; thinking: string };
     const textBlock = output.content[1] as { type: string; text: string };
@@ -2108,7 +2118,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.stopReason).toBe("toolUse");
     expect(output.content).toMatchObject([
@@ -2214,7 +2229,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.stopReason).toBe("toolUse");
     expect(output.content).toMatchObject([
@@ -2303,7 +2323,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.stopReason).toBe("toolUse");
     expect(output.content).toMatchObject([
@@ -2389,7 +2414,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.content).toMatchObject([
       {
@@ -2461,7 +2491,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.content).toMatchObject([
       { type: "text", text: "Visible first." },
@@ -2532,7 +2567,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.content).toMatchObject([
       {
@@ -2601,7 +2641,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.content).toMatchObject([
       { type: "text", text: "Visible answer." },
@@ -2709,7 +2754,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.stopReason).toBe("toolUse");
     expect(output.content).toMatchObject([
@@ -2827,7 +2877,12 @@ describe("openai transport stream", () => {
       }
     }
 
-    await __testing.processOpenAICompletionsStream(mockStream(), output, model, stream);
+    await openaiTransportTesting.processOpenAICompletionsStream(
+      mockStream(),
+      output,
+      model,
+      stream,
+    );
 
     expect(output.stopReason).toBe("toolUse");
     expect(output.content).toMatchObject([
@@ -2915,7 +2970,7 @@ describe("openai transport stream", () => {
     }
 
     await expect(
-      __testing.processOpenAICompletionsStream(mockStream(), output, model, stream),
+      openaiTransportTesting.processOpenAICompletionsStream(mockStream(), output, model, stream),
     ).rejects.toThrow("Exceeded post-tool-call delta buffer limit");
   });
 
@@ -2984,7 +3039,7 @@ describe("openai transport stream", () => {
     }
 
     await expect(
-      __testing.processOpenAICompletionsStream(mockStream(), output, model, stream),
+      openaiTransportTesting.processOpenAICompletionsStream(mockStream(), output, model, stream),
     ).rejects.toThrow("Exceeded tool-call argument buffer limit");
   });
 });

@@ -918,6 +918,48 @@ describe("resolveApiKeyForProvider – synthetic local auth for custom providers
   });
 });
 
+describe("resolveApiKeyForProvider – google-vertex environment resolution", () => {
+  it("defaults to Vertex credentials marker when GOOGLE_CLOUD_PROJECT is set", async () => {
+    const previous = process.env.GOOGLE_CLOUD_PROJECT;
+    process.env.GOOGLE_CLOUD_PROJECT = "my-project";
+    try {
+      const auth = await resolveApiKeyForProvider({
+        provider: "google-vertex",
+        cfg: { models: { providers: {} } },
+      });
+      expect(auth.apiKey).toBe(GCP_VERTEX_CREDENTIALS_MARKER);
+      expect(auth.source).toBe("gcloud adc");
+    } finally {
+      process.env.GOOGLE_CLOUD_PROJECT = previous;
+    }
+  });
+
+  it("does not default to Vertex credentials marker when no GCP indicators are set", async () => {
+    const previousGcp = process.env.GOOGLE_CLOUD_PROJECT;
+    const previousGcloud = process.env.GCLOUD_PROJECT;
+    const previousAdc = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    const previousCore = process.env.CLOUDSDK_CORE_PROJECT;
+    delete process.env.GOOGLE_CLOUD_PROJECT;
+    delete process.env.GCLOUD_PROJECT;
+    delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    delete process.env.CLOUDSDK_CORE_PROJECT;
+
+    try {
+      await expect(
+        resolveApiKeyForProvider({
+          provider: "google-vertex",
+          cfg: { models: { providers: {} } },
+        }),
+      ).rejects.toThrow('No API key found for provider "google-vertex"');
+    } finally {
+      process.env.GOOGLE_CLOUD_PROJECT = previousGcp;
+      process.env.GCLOUD_PROJECT = previousGcloud;
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = previousAdc;
+      process.env.CLOUDSDK_CORE_PROJECT = previousCore;
+    }
+  });
+});
+
 describe("applyLocalNoAuthHeaderOverride", () => {
   const originalFetch = globalThis.fetch;
 

@@ -860,6 +860,13 @@ describe("getApiKeyForModel", () => {
     });
   });
 
+  it("resolveEnvApiKey('google-vertex') defaults to GCP_VERTEX_CREDENTIALS_MARKER when no env vars are set", async () => {
+    const resolved = resolveEnvApiKey("google-vertex", {} as NodeJS.ProcessEnv);
+
+    expect(resolved?.apiKey).toBe("gcp-vertex-credentials");
+    expect(resolved?.source).toBe("gcloud adc");
+  });
+
   it("resolveEnvApiKey('anthropic-vertex') accepts GOOGLE_APPLICATION_CREDENTIALS with project_id", async () => {
     await expectVertexAdcEnvApiKey({
       provider: "anthropic-vertex",

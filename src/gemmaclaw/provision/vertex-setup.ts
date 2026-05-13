@@ -18,6 +18,7 @@ import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline/promises";
+import { GCP_VERTEX_CREDENTIALS_MARKER } from "../../agents/model-auth-markers.js";
 
 export type VertexConfig = {
   project: string;
@@ -25,12 +26,16 @@ export type VertexConfig = {
   model: string;
   /** API format: "native" for Gemini API, "openai" for OpenAI-compatible. */
   apiFormat?: "native" | "openai";
-  /** Access token from gcloud (short-lived, refreshed per session). */
+  /** Access token from gcloud (short-lived, refreshed per session) OR the automated marker. */
   accessToken?: string;
+  /** Dedicated prediction URL for Model Garden / vLLM endpoints. */
+  dedicatedUrl?: string;
   /** Path to ADC credentials file. */
   adcPath?: string;
   /** Path to service account JSON key file. */
   serviceAccountKeyPath?: string;
+  /** Whether to use automated gcloud auth instead of a static token. */
+  useAutomatedCredentials?: boolean;
 };
 
 export type VertexSetupResult = {
@@ -49,6 +54,7 @@ export const VERTEX_GEMMA_MODELS = [
   { id: "gemma-2-2b-it", display: "Gemma 2 2B IT", params: "2B" },
   { id: "gemma-2-9b-it", display: "Gemma 2 9B IT", params: "9B" },
   { id: "gemma-2-27b-it", display: "Gemma 2 27B IT", params: "27B" },
+  { id: "model-garden-vllm", display: "Dedicated Model Garden Endpoint (vLLM)", params: "Custom" },
 ] as const;
 
 /** Check if gcloud CLI is available. */
@@ -134,9 +140,14 @@ export async function testVertexConnection(
 export function buildVertexConfig(vertex: VertexConfig): Record<string, unknown> {
   const isNative = vertex.apiFormat === "native";
 
-  const baseUrl = isNative
+  let baseUrl = isNative
     ? `https://${vertex.region}-aiplatform.googleapis.com/v1/projects/${vertex.project}/locations/${vertex.region}/publishers/google`
     : `https://${vertex.region}-aiplatform.googleapis.com/v1beta1/projects/${vertex.project}/locations/${vertex.region}/endpoints/openapi`;
+
+  // Override with dedicated URL if provided (Model Garden vLLM)
+  if (vertex.dedicatedUrl) {
+    baseUrl = vertex.dedicatedUrl;
+  }
 
   const api = isNative ? "google-generative-ai" : "openai-responses";
 
@@ -152,6 +163,7 @@ export function buildVertexConfig(vertex: VertexConfig): Record<string, unknown>
       providers: {
         "google-vertex": {
           baseUrl,
+          apiKey: vertex.accessToken || "not-set",
           models: [
             {
               id: vertex.model,
@@ -231,6 +243,35 @@ export async function interactiveVertexSetup(opts?: {
     }
   }
   log(`  Protocol: ${apiFormat}`);
+
+  let dedicatedUrl: string | undefined;
+  if (apiFormat === "openai" && !opts?.nonInteractive) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await rl.question(
+      "\nDedicated Prediction URL (optional):\n" +
+        "  For Model Garden vLLM, enter the endpoint URL.\n" +
+        "  Press enter to use the standard Vertex OpenAI-compatible URL.\n" +
+        "URL: ",
+    );
+    rl.close();
+    if (answer.trim()) {
+      dedicatedUrl = answer.trim();
+    }
+  }
+
+  // Auth Method: Static vs Automated
+  let useAutomatedCredentials = false;
+  if (!useServiceAccount && !opts?.nonInteractive) {
+    log("\nSelect Auth Method:");
+    log("  1) Automated gcloud (recommended, refreshes token per turn)");
+    log("  2) Static Token (short-lived, expires)");
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const choice = await rl.question("Choice [1-2] (default: 1): ");
+    rl.close();
+    if (choice.trim() !== "2") {
+      useAutomatedCredentials = true;
+    }
+  }
 
   // 5. Get access token
   log("Getting access token...");
@@ -317,8 +358,12 @@ export async function interactiveVertexSetup(opts?: {
       region,
       model,
       apiFormat,
-      accessToken: accessToken ?? undefined,
+      accessToken: useAutomatedCredentials
+        ? GCP_VERTEX_CREDENTIALS_MARKER
+        : (accessToken ?? undefined),
+      dedicatedUrl,
       adcPath: adcPath ?? undefined,
+      useAutomatedCredentials,
     },
   };
 }

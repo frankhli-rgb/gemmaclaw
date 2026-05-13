@@ -72,57 +72,50 @@ export function resolveEmbeddedAgentStreamFn(params: {
   resolvedApiKey?: string;
   authStorage?: { getApiKey(provider: string): Promise<string | undefined> };
 }): StreamFn {
-  if (params.providerStreamFn) {
-    const inner = params.providerStreamFn;
-    const normalizeContext = (context: Parameters<StreamFn>[1]) =>
-      context.systemPrompt
-        ? {
-            ...context,
-            systemPrompt: stripSystemPromptCacheBoundary(context.systemPrompt),
-          }
-        : context;
-    // Provider-owned transports bypass pi-coding-agent's default auth lookup,
-    // so keep injecting the resolved runtime apiKey for streamSimple-compatible
-    // transports that still read credentials from options.apiKey.
-    if (params.authStorage || params.resolvedApiKey) {
-      const { authStorage, model, resolvedApiKey } = params;
-      return async (m, context, options) => {
-        const apiKey = await resolveEmbeddedAgentApiKey({
-          provider: model.provider,
-          resolvedApiKey,
-          authStorage,
-        });
-        return inner(m, normalizeContext(context), {
-          ...options,
-          apiKey: apiKey ?? options?.apiKey,
-        });
-      };
+  const normalizeContext = (context: Parameters<StreamFn>[1]) =>
+    context.systemPrompt
+      ? {
+          ...context,
+          systemPrompt: stripSystemPromptCacheBoundary(context.systemPrompt),
+        }
+      : context;
+
+  const inner: StreamFn = (() => {
+    if (params.providerStreamFn) {
+      return params.providerStreamFn;
     }
-    return (m, context, options) => inner(m, normalizeContext(context), options);
-  }
 
-  const currentStreamFn = params.currentStreamFn ?? streamSimple;
-  if (params.shouldUseWebSocketTransport) {
-    return params.wsApiKey
-      ? createOpenAIWebSocketStreamFn(params.wsApiKey, params.sessionId, {
-          signal: params.signal,
-          managerOptions: {
-            request: getModelProviderRequestTransport(params.model),
-          },
-        })
-      : currentStreamFn;
-  }
+    if (params.shouldUseWebSocketTransport && params.wsApiKey) {
+      return createOpenAIWebSocketStreamFn(params.wsApiKey, params.sessionId, {
+        signal: params.signal,
+        managerOptions: {
+          request: getModelProviderRequestTransport(params.model),
+        },
+      });
+    }
 
-  if (params.model.provider === "anthropic-vertex") {
-    return createAnthropicVertexStreamFnForModel(params.model);
-  }
+    if (params.model.provider === "anthropic-vertex") {
+      return createAnthropicVertexStreamFnForModel(params.model);
+    }
 
-  if (params.currentStreamFn === undefined || params.currentStreamFn === streamSimple) {
     const boundaryAwareStreamFn = createBoundaryAwareStreamFnForModel(params.model);
     if (boundaryAwareStreamFn) {
       return boundaryAwareStreamFn;
     }
-  }
 
-  return currentStreamFn;
+    return params.currentStreamFn ?? streamSimple;
+  })();
+
+  const { authStorage, model, resolvedApiKey } = params;
+  return async (m, context, options) => {
+    const apiKey = await resolveEmbeddedAgentApiKey({
+      provider: model.provider,
+      resolvedApiKey,
+      authStorage,
+    });
+    return inner(m, normalizeContext(context), {
+      ...options,
+      apiKey: apiKey ?? options?.apiKey,
+    });
+  };
 }

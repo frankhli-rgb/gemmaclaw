@@ -1,4 +1,5 @@
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
+import { runExec } from "openclaw/plugin-sdk/process-runtime";
 import { createProviderApiKeyAuthMethod } from "openclaw/plugin-sdk/provider-auth-api-key";
 import type { ProviderPlugin } from "openclaw/plugin-sdk/provider-model-shared";
 import { normalizeGoogleModelId } from "./model-id.js";
@@ -89,6 +90,13 @@ export function buildGoogleVertexProvider(): ProviderPlugin {
     normalizeTransport: ({ api, baseUrl }) => resolveGoogleGenerativeAiTransport({ api, baseUrl }),
     normalizeConfig: ({ provider, providerConfig }) =>
       normalizeGoogleProviderConfig(provider, providerConfig),
+    prepareRuntimeAuth: async (_ctx) => {
+      const result = await runExec("gcloud", ["auth", "application-default", "print-access-token"]);
+      return {
+        apiKey: result.stdout.trim(),
+        expiresAt: Date.now() + 55 * 60 * 1000,
+      };
+    },
     normalizeModelId: ({ modelId }) => normalizeGoogleModelId(modelId),
     resolveDynamicModel: (ctx) =>
       resolveGoogleGeminiForwardCompatModel({
