@@ -10,6 +10,7 @@ import {
   type ThinkingLevel,
 } from "@mariozechner/pi-ai";
 import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
+import { readResponseTextSnippet } from "../media/read-response-with-limit.js";
 import {
   applyAnthropicPayloadPolicyToParams,
   resolveAnthropicPayloadPolicy,
@@ -28,6 +29,9 @@ import {
 } from "./transport-stream-shared.js";
 
 const CLAUDE_CODE_VERSION = "2.1.75";
+const ANTHROPIC_MESSAGES_ERROR_BODY_MAX_BYTES = 8 * 1024;
+const ANTHROPIC_MESSAGES_ERROR_BODY_MAX_CHARS = 400;
+const ANTHROPIC_MESSAGES_ERROR_BODY_READ_IDLE_TIMEOUT_MS = 10_000;
 const CLAUDE_CODE_TOOLS = [
   "Read",
   "Write",
@@ -505,7 +509,7 @@ function createAnthropicMessagesClient(params: {
           signal: options?.signal,
         });
         if (!response.ok) {
-          const detail = await response.text().catch(() => "");
+          const detail = await readAnthropicMessagesErrorBodySnippet(response);
           throw new Error(
             detail || `Anthropic Messages request failed with HTTP ${response.status}`,
           );
@@ -517,6 +521,30 @@ function createAnthropicMessagesClient(params: {
       },
     },
   };
+}
+
+async function readAnthropicMessagesErrorBodySnippet(response: Response): Promise<string> {
+  try {
+    return (
+      (await readResponseTextSnippet(response, {
+        maxBytes: ANTHROPIC_MESSAGES_ERROR_BODY_MAX_BYTES,
+        maxChars: ANTHROPIC_MESSAGES_ERROR_BODY_MAX_CHARS,
+        chunkTimeoutMs: ANTHROPIC_MESSAGES_ERROR_BODY_READ_IDLE_TIMEOUT_MS,
+        onIdleTimeout: ({ chunkTimeoutMs }) =>
+          new Error(
+            `Anthropic Messages error response stalled: no data received for ${chunkTimeoutMs}ms`,
+          ),
+      })) ?? ""
+    );
+  } catch (error: unknown) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith("Anthropic Messages error response stalled:")
+    ) {
+      return error.message;
+    }
+    return "";
+  }
 }
 
 function createAnthropicTransportClient(params: {
@@ -776,7 +804,6 @@ export function createAnthropicMessagesTransportStreamFn(): StreamFn {
           { ...params, stream: true },
           transportOptions.signal ? { signal: transportOptions.signal } : undefined,
         );
-        stream.push({ type: "start", partial: output as never });
         const blocks = output.content;
         for await (const event of anthropicStream) {
           if (event.type === "error") {
@@ -803,6 +830,11 @@ export function createAnthropicMessagesTransportStreamFn(): StreamFn {
               output.usage.cacheRead +
               output.usage.cacheWrite;
             calculateCost(model, output.usage);
+            // Defer start until after message_start so that pre-stream SSE errors
+            // (e.g. invalid thinking signatures) arrive before any non-error event
+            // is yielded, keeping yieldedOutput=false in pumpStreamWithRecovery
+            // and allowing the thinking-block recovery retry to fire.
+            stream.push({ type: "start", partial: output as never });
             continue;
           }
           if (event.type === "content_block_start") {

@@ -273,6 +273,7 @@ type WebFetchRuntimeParams = {
   readabilityEnabled: boolean;
   ssrfPolicy?: {
     allowRfc2544BenchmarkRange?: boolean;
+    allowIpv6UniqueLocalRange?: boolean;
   };
   lookupFn?: LookupFn;
   resolveProviderFallback: () => Promise<WebFetchProviderFallback>;
@@ -298,6 +299,24 @@ function normalizeProviderFinalUrl(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Sanitize a web_fetch URL parameter that may contain LLM-injected whitespace.
+ *
+ * Fixes the reported case where a model emits a space between the scheme and
+ * authority (e.g. `https:// docs.openclaw.ai`), which causes `new URL()` to
+ * throw. Path and query whitespace is intentionally preserved — the WHATWG URL
+ * parser percent-encodes those characters correctly per RFC 3986.
+ */
+export function sanitizeWebFetchUrl(raw: string): string {
+  let end = raw.length;
+  while (end > 0 && raw.charCodeAt(end - 1) <= 0x20) {
+    end -= 1;
+  }
+  const trimmed = raw.slice(0, end).replace(/^\s+/, "");
+  const repaired = trimmed.replace(/^(https?:\/\/)\s+/i, "$1");
+  return repaired.replace(/^(https?:\/\/[^/?#\s]+)\s+$/i, "$1");
 }
 
 function normalizeProviderWebFetchPayload(params: {
@@ -388,8 +407,9 @@ async function maybeFetchProviderWebFetchPayload(
 
 async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string, unknown>> {
   const allowRfc2544BenchmarkRange = params.ssrfPolicy?.allowRfc2544BenchmarkRange === true;
+  const allowIpv6UniqueLocalRange = params.ssrfPolicy?.allowIpv6UniqueLocalRange === true;
   const cacheKey = normalizeCacheKey(
-    `fetch:${params.url}:${params.extractMode}:${params.maxChars}${allowRfc2544BenchmarkRange ? ":allow-rfc2544" : ""}`,
+    `fetch:${params.url}:${params.extractMode}:${params.maxChars}${allowRfc2544BenchmarkRange ? ":allow-rfc2544" : ""}${allowIpv6UniqueLocalRange ? ":allow-ipv6-ula" : ""}`,
   );
   const cached = readCache(FETCH_CACHE, cacheKey);
   if (cached) {
@@ -417,7 +437,13 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
       maxRedirects: params.maxRedirects,
       timeoutSeconds: params.timeoutSeconds,
       lookupFn: params.lookupFn,
-      policy: allowRfc2544BenchmarkRange ? { allowRfc2544BenchmarkRange } : undefined,
+      policy:
+        allowRfc2544BenchmarkRange || allowIpv6UniqueLocalRange
+          ? {
+              ...(allowRfc2544BenchmarkRange ? { allowRfc2544BenchmarkRange } : {}),
+              ...(allowIpv6UniqueLocalRange ? { allowIpv6UniqueLocalRange } : {}),
+            }
+          : undefined,
       init: {
         headers: {
           Accept: "text/markdown, text/html;q=0.9, */*;q=0.1",
@@ -630,7 +656,9 @@ export function createWebFetchTool(options?: {
     parameters: WebFetchSchema,
     execute: async (_toolCallId, args) => {
       const params = args as Record<string, unknown>;
-      const url = readStringParam(params, "url", { required: true });
+      const url = sanitizeWebFetchUrl(
+        readStringParam(params, "url", { required: true, trim: false }),
+      );
       const extractMode = readStringParam(params, "extractMode") === "text" ? "text" : "markdown";
       const maxChars = readNumberParam(params, "maxChars", { integer: true });
       const maxCharsCap = resolveFetchMaxCharsCap(fetch);
