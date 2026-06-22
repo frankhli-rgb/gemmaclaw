@@ -19,6 +19,29 @@ export function normalizeGooglePreviewModelId(id: string): string {
   return id;
 }
 
+export function normalizeGoogleVertexPreviewModelId(id: string): string {
+  if (
+    id === "gemini-3-pro" ||
+    id === "gemini-3-pro-preview" ||
+    id === "gemini-3.1-pro" ||
+    id === "gemini-3.1-pro-preview"
+  ) {
+    return "gemini-3.1-pro-preview";
+  }
+  if (
+    id === "gemini-3-flash" ||
+    id === "gemini-3-flash-preview" ||
+    id === "gemini-3.1-flash" ||
+    id === "gemini-3.1-flash-preview"
+  ) {
+    return "gemini-3.1-flash-preview";
+  }
+  if (id === "gemini-3.1-flash-lite" || id === "gemini-3.1-flash-lite-preview") {
+    return "gemini-3.1-flash-lite-preview";
+  }
+  return id;
+}
+
 export function normalizeAntigravityPreviewModelId(id: string): string {
   if (ANTIGRAVITY_BARE_PRO_IDS.has(id)) {
     return `${id}-low`;

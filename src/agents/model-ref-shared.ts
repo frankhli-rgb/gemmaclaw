@@ -1,5 +1,6 @@
 import {
   normalizeGooglePreviewModelId,
+  normalizeGoogleVertexPreviewModelId,
   normalizeNativeXaiModelId,
 } from "../plugin-sdk/provider-model-id-normalize.js";
 import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
@@ -63,8 +64,11 @@ export function normalizeStaticProviderModelId(provider: string, model: string):
   if (provider === "huggingface") {
     return normalizeHuggingfaceModelId(model);
   }
-  if (provider === "google" || provider === "google-vertex") {
+  if (provider === "google") {
     return normalizeGooglePreviewModelId(model);
+  }
+  if (provider === "google-vertex") {
+    return normalizeGoogleVertexPreviewModelId(model);
   }
   if (provider === "openrouter" && !model.includes("/")) {
     return `openrouter/${model}`;
